@@ -78,7 +78,7 @@ export const Sidebar: React.FC = () => {
                         `flex items-center space-x-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
                           isActive(item.url) || navIsActive
                             ? 'bg-primary text-primary-foreground shadow-card'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                            : 'text-foreground bg-muted'
                         }`
                       }
                     >
