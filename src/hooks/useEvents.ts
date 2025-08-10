@@ -48,9 +48,18 @@ export const useEvents = () => {
 
     fetchEvents();
   }, [toast]);
+    const getEvent = (id: string) => {
+    return events.find(e => String(e.id) === String(id));
+  };
+  
+ const updateEvent = async (id: string | number, formData: any) => {
+  await axios.put(`${API_URL}/api/events/edit/${id}`, formData);
+};
 
   return {
     events,
     loading,
+    getEvent,
+    updateEvent,
   };
 };

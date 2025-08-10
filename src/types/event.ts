@@ -1,5 +1,5 @@
 export interface Event {
-  id: string;
+  id?: string;
   name: string;
   description: string;
   date: string;
@@ -9,11 +9,9 @@ export interface Event {
   speakerDescription: string;
   speakerPosition: string;
   company: string;
-  posterUrl?: string;
   videoUrl?: string;
   bookingUrl: string;
-  createdAt: string;
-  updatedAt: string;
+  posterUrl?: string;
 }
 
 export interface EventFormData {
@@ -26,7 +24,6 @@ export interface EventFormData {
   speakerDescription: string;
   speakerPosition: string;
   company: string;
-  posterFile?: File;
   videoUrl?: string;
   bookingUrl: string;
 }

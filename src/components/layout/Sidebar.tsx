@@ -36,6 +36,11 @@ const navigation = [
     icon: Plus,
   },
   // {
+  //   title: 'Landing',
+  //   url: '/dashboard/landing',
+  //   icon: LayoutDashboard
+  // },
+  // {
   //   title: 'Settings',
   //   url: '/dashboard/settings',
   //   icon: Settings,

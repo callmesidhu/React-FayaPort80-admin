@@ -1,17 +1,16 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Upload, Image, Loader2, Save, ArrowLeft } from 'lucide-react';
+import { Loader2, Save, ArrowLeft } from 'lucide-react';
 import { Event, EventFormData } from '@/types/event';
+import { apiService } from '@/services/apiService';
+import { EventInfoCard } from '@/components/EventInfoCard';
+import { SpeakerInfoCard } from '@/components/SpeakerInfoCard';
+import { MediaLinksCard } from '@/components/MediaLinksCard';
 
 interface EventFormProps {
   initialData?: Event;
-  onSubmit: (data: EventFormData) => Promise<boolean>;
+  onSubmit?: (data: EventFormData) => Promise<any>;
   title: string;
   description: string;
 }
@@ -23,9 +22,10 @@ export const EventForm: React.FC<EventFormProps> = ({
   description 
 }) => {
   const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [posterPreview, setPosterPreview] = useState<string | undefined>(initialData?.posterUrl);
+  const [uploadedPosterUrl, setUploadedPosterUrl] = useState<string | undefined>(initialData?.posterUrl);
+  const [userDetails, setUserDetails] = useState<any>(null);
   
   const [formData, setFormData] = useState<EventFormData>({
     name: initialData?.name || '',
@@ -41,31 +41,98 @@ export const EventForm: React.FC<EventFormProps> = ({
     bookingUrl: initialData?.bookingUrl || '',
   });
 
+  // Fetch user details on component mount
+  useEffect(() => {
+    const fetchUserDetails = async () => {
+      try {
+        const details = await apiService.getUserDetails();
+        setUserDetails(details);
+      } catch (error) {
+        console.error('Failed to fetch user details:', error);
+        // Handle error - maybe redirect to login
+      }
+    };
+
+    fetchUserDetails();
+  }, []);
+
   const handleInputChange = (field: keyof EventFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setFormData(prev => ({ ...prev, posterFile: file }));
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setPosterPreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
+  const handlePosterChange = (previewUrl: string | undefined, uploadedUrl: string | undefined) => {
+    setPosterPreview(previewUrl);
+    setUploadedPosterUrl(uploadedUrl);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!userDetails?.port_uuid) {
+      alert('User details not loaded. Please refresh and try again.');
+      return;
+    }
+
+    if (!uploadedPosterUrl) {
+      alert('Please upload a poster before submitting.');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const success = await onSubmit(formData);
-      if (success) {
-        navigate('/dashboard/events');
+      // Prepare data for API - ensure all required fields are strings
+      const eventData = {
+        port_uuid: userDetails.port_uuid,
+        event_name: formData.name.trim(),
+        event_description: formData.description.trim(),
+        event_location: formData.location.trim(),
+        event_time: formData.time,
+        event_date: formData.date,
+        event_poster_url: uploadedPosterUrl,
+        video_url: formData.videoUrl?.trim() || '',
+        speaker_name: formData.speakerName.trim(),
+        speaker_description: formData.speakerDescription.trim(),
+        speaker_position: formData.speakerPosition.trim(),
+        company: formData.company.trim(),
+        booking_url: formData.bookingUrl.trim(),
+      };
+
+      // Validate required fields
+      const requiredFields = [
+        { key: 'event_name', value: eventData.event_name },
+        { key: 'event_description', value: eventData.event_description },
+        { key: 'event_location', value: eventData.event_location },
+        { key: 'event_time', value: eventData.event_time },
+        { key: 'event_date', value: eventData.event_date },
+        { key: 'speaker_name', value: eventData.speaker_name },
+        { key: 'speaker_description', value: eventData.speaker_description },
+        { key: 'speaker_position', value: eventData.speaker_position },
+        { key: 'company', value: eventData.company },
+        { key: 'booking_url', value: eventData.booking_url },
+      ];
+
+      const missingFields = requiredFields.filter(field => !field.value);
+      if (missingFields.length > 0) {
+        alert(`Please fill in all required fields: ${missingFields.map(f => f.key).join(', ')}`);
+        return;
       }
+
+      console.log('Final event data being sent:', eventData);
+
+      const result = await apiService.submitEvent(eventData);
+      console.log('Event submitted successfully:', result);
+      
+      // Call the provided onSubmit if it exists for additional processing
+      if (onSubmit && typeof onSubmit === 'function') {
+        await onSubmit(formData);
+      }
+      
+      navigate('/dashboard/events');
+    } catch (error) {
+      console.error('Failed to submit event:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Failed to submit event: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -90,220 +157,24 @@ export const EventForm: React.FC<EventFormProps> = ({
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid gap-6 lg:grid-cols-2">
-          {/* Event Information */}
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle>Event Information</CardTitle>
-              <CardDescription>Basic details about the event</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Event Name *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  required
-                  className="transition-all duration-200 focus:shadow-soft"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="description">Description *</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => handleInputChange('description', e.target.value)}
-                  required
-                  rows={3}
-                  className="transition-all duration-200 focus:shadow-soft"
-                />
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="date">Event Date *</Label>
-                  <Input
-                    id="date"
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => handleInputChange('date', e.target.value)}
-                    required
-                    className="transition-all duration-200 focus:shadow-soft"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="time">Event Time *</Label>
-                  <Input
-                    id="time"
-                    type="time"
-                    value={formData.time}
-                    onChange={(e) => handleInputChange('time', e.target.value)}
-                    required
-                    className="transition-all duration-200 focus:shadow-soft"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="location">Location *</Label>
-                <Input
-                  id="location"
-                  value={formData.location}
-                  onChange={(e) => handleInputChange('location', e.target.value)}
-                  required
-                  className="transition-all duration-200 focus:shadow-soft"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Speaker Information */}
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle>Speaker Information</CardTitle>
-              <CardDescription>Details about the event speaker</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="speakerName">Speaker Name *</Label>
-                <Input
-                  id="speakerName"
-                  value={formData.speakerName}
-                  onChange={(e) => handleInputChange('speakerName', e.target.value)}
-                  required
-                  className="transition-all duration-200 focus:shadow-soft"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="speakerPosition">Position *</Label>
-                <Input
-                  id="speakerPosition"
-                  value={formData.speakerPosition}
-                  onChange={(e) => handleInputChange('speakerPosition', e.target.value)}
-                  required
-                  className="transition-all duration-200 focus:shadow-soft"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="company">Company *</Label>
-                <Input
-                  id="company"
-                  value={formData.company}
-                  onChange={(e) => handleInputChange('company', e.target.value)}
-                  required
-                  className="transition-all duration-200 focus:shadow-soft"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="speakerDescription">Speaker Bio *</Label>
-                <Textarea
-                  id="speakerDescription"
-                  value={formData.speakerDescription}
-                  onChange={(e) => handleInputChange('speakerDescription', e.target.value)}
-                  required
-                  rows={3}
-                  className="transition-all duration-200 focus:shadow-soft"
-                />
-              </div>
-            </CardContent>
-          </Card>
+          <EventInfoCard 
+            formData={formData}
+            onInputChange={handleInputChange}
+          />
+          
+          <SpeakerInfoCard 
+            formData={formData}
+            onInputChange={handleInputChange}
+          />
         </div>
 
-        {/* Media & Links */}
-        <Card className="shadow-card">
-          <CardHeader>
-            <CardTitle>Media & Links</CardTitle>
-            <CardDescription>Upload poster and add relevant links</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Event Poster</Label>
-              <div className="border-2 border-dashed border-border rounded-lg p-6 transition-all duration-200 hover:border-primary/50">
-                {posterPreview ? (
-                  <div className="space-y-4">
-                    <div className="relative max-w-xs mx-auto">
-                      <img 
-                        src={posterPreview} 
-                        alt="Poster preview" 
-                        className="rounded-lg shadow-medium w-full h-auto"
-                      />
-                      <Badge className="absolute top-2 right-2 bg-primary">
-                        Preview
-                      </Badge>
-                    </div>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-full transition-all duration-200 hover:shadow-soft"
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Change Poster
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="text-center space-y-4">
-                    <Image className="h-12 w-12 mx-auto text-muted-foreground" />
-                    <div>
-                      <h4 className="font-medium">Upload event poster</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Drag and drop or click to browse
-                      </p>
-                    </div>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={() => fileInputRef.current?.click()}
-                      className="transition-all duration-200 hover:shadow-soft"
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload Poster
-                    </Button>
-                  </div>
-                )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="videoUrl">Video URL</Label>
-                <Input
-                  id="videoUrl"
-                  type="url"
-                  placeholder="https://youtube.com/watch?v=..."
-                  value={formData.videoUrl}
-                  onChange={(e) => handleInputChange('videoUrl', e.target.value)}
-                  className="transition-all duration-200 focus:shadow-soft"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="bookingUrl">Booking URL *</Label>
-                <Input
-                  id="bookingUrl"
-                  type="url"
-                  placeholder="https://eventbrite.com/..."
-                  value={formData.bookingUrl}
-                  onChange={(e) => handleInputChange('bookingUrl', e.target.value)}
-                  required
-                  className="transition-all duration-200 focus:shadow-soft"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <MediaLinksCard
+          formData={formData}
+          onInputChange={handleInputChange}
+          posterPreview={posterPreview}
+          uploadedPosterUrl={uploadedPosterUrl}
+          onPosterChange={handlePosterChange}
+        />
 
         {/* Submit Button */}
         <div className="flex justify-end space-x-4">
@@ -317,7 +188,7 @@ export const EventForm: React.FC<EventFormProps> = ({
           </Button>
           <Button 
             type="submit" 
-            disabled={loading}
+            disabled={loading || !uploadedPosterUrl}
             className="transition-all duration-200 hover:shadow-soft"
           >
             {loading ? (
