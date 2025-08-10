@@ -5,8 +5,12 @@ import { useEvents } from '@/hooks/useEvents';
 
 export const EditEvent: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { getEvent, updateEvent } = useEvents();
-  
+  const { getEvent, updateEvent, loading } = useEvents();
+
+  if (loading) {
+    return <div>Loading event...</div>; // could replace with spinner
+  }
+
   const event = id ? getEvent(id) : undefined;
 
   if (!event) {

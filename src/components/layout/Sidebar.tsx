@@ -35,11 +35,11 @@ const navigation = [
     url: '/dashboard/events/new',
     icon: Plus,
   },
-  {
-    title: 'Settings',
-    url: '/dashboard/settings',
-    icon: Settings,
-  },
+  // {
+  //   title: 'Settings',
+  //   url: '/dashboard/settings',
+  //   icon: Settings,
+  // },
 ];
 
 export const Sidebar: React.FC = () => {

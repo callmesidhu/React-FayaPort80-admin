@@ -41,7 +41,6 @@ export const useAuthProvider = (): AuthContextType => {
         // Store tokens
         localStorage.setItem('accessToken', res.data.accessToken);
 
-        // Save refreshToken in cookies for security
         document.cookie = `refreshToken=${res.data.refreshToken}; path=/; secure; samesite=strict`;
 
         setIsAuthenticated(true);
