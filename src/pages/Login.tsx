@@ -33,7 +33,7 @@ export const Login: React.FC = () => {
       } else {
         toast({
           title: "Login failed",
-          description: "Invalid credentials. Try admin@port80.com / admin123",
+          description: "Invalid credentials.",
           variant: "destructive",
         });
       }
@@ -103,13 +103,7 @@ export const Login: React.FC = () => {
             </Button>
           </form>
           
-          <div className="mt-6 p-4 bg-muted rounded-lg">
-            <p className="text-sm text-muted-foreground text-center">
-              Demo credentials:<br />
-              <span className="font-mono">admin@port80.com</span><br />
-              <span className="font-mono">admin123</span>
-            </p>
-          </div>
+        
         </CardContent>
       </Card>
     </div>

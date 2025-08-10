@@ -1,4 +1,8 @@
+// src/hooks/useAuth.tsx
 import { useState, useEffect, createContext, useContext } from 'react';
+import axios from 'axios';
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -22,8 +26,7 @@ export const useAuthProvider = (): AuthContextType => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is already authenticated on mount
-    const token = localStorage.getItem('admin_token');
+    const token = localStorage.getItem('accessToken');
     if (token) {
       setIsAuthenticated(true);
     }
@@ -31,17 +34,29 @@ export const useAuthProvider = (): AuthContextType => {
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Simple authentication - in real app, this would be an API call
-    if (email === 'admin@port80.com' && password === 'admin123') {
-      localStorage.setItem('admin_token', 'demo_token');
-      setIsAuthenticated(true);
-      return true;
+    try {
+      const res = await axios.post(`${API_URL}/api/auth/login`, { email, password });
+
+      if (res.data.accessToken && res.data.refreshToken) {
+        // Store tokens
+        localStorage.setItem('accessToken', res.data.accessToken);
+
+        // Save refreshToken in cookies for security
+        document.cookie = `refreshToken=${res.data.refreshToken}; path=/; secure; samesite=strict`;
+
+        setIsAuthenticated(true);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Login failed', err);
+      return false;
     }
-    return false;
   };
 
   const logout = () => {
-    localStorage.removeItem('admin_token');
+    localStorage.removeItem('accessToken');
+    document.cookie = 'refreshToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
     setIsAuthenticated(false);
   };
 
